@@ -1138,13 +1138,18 @@ class GCPPEASS(CloudPEASS):
 				if not page_token:
 					print(f"{Fore.GREEN}No more files to display.")
 					break
-
-			if self.no_ask:
-				cont = 'n'
-			else:
+ 
+				if self.no_ask:
+					break
+ 
 				cont = input("Do you want to see more files? (y/N): ")
-
-
+				if cont.lower() != 'y':
+					break
+ 
+		except Exception as e:
+			print(f"{Fore.RED}Error listing files: {e}")
+ 
+ 
 	def list_gmail_emails(self, creds):
 		"""
 		List emails from the Gmail account associated with the current token.
@@ -1176,23 +1181,20 @@ class GCPPEASS(CloudPEASS):
 					print(f"{Fore.BLUE}Snippet: {Fore.WHITE}{msg['snippet']}")
 					print("-" * 50)
 
-				page_token = results.get('nextPageToken')
-				if not page_token:
-					print(f"{Fore.GREEN}No more emails to display.")
-					break
+					page_token = results.get('nextPageToken')
+					if not page_token:
+						print(f"{Fore.GREEN}No more emails to display.")
+						break
 
-			if self.no_ask:
-				cont = 'n'
-			else:
-				cont = input("Do you want to see more emails? (y/N): ")
+					if self.no_ask:
+						break
 
+					cont = input("Do you want to see more emails? (y/N): ")
+					if cont.lower() != 'y':
+						break
 
-
-
-
-
-
-
+		except Exception as e:
+			print(f"{Fore.RED}Error listing emails: {e}")
 if __name__ == "__main__":
 	parser = argparse.ArgumentParser(description="GCPPEASS: Enumerate GCP permissions and check for privilege escalations and other attacks with HackTricks AI.")
 

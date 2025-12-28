@@ -132,21 +132,47 @@ class AWSBruteForce():
     def capitalize(self, command):
         return ''.join(word.capitalize() for word in command.split('-'))
 
-    def run_command(self, profile, region, service, command, extra='', cont=0):
-        # Build base command
+    def _build_command(self, profile, region, service, command, extra):
         if profile:
-            full_command = f'aws --cli-connect-timeout 19 --profile {profile} --region {region} {service} {command} {extra}'
-            env = None
+            base = f'aws --cli-connect-timeout 19 --profile {profile} --region {region} {service} {command} {extra}'
         else:
-            # Use credentials via environment variables
-            full_command = f'aws --cli-connect-timeout 19 --region {region} {service} {command} {extra}'
-            env = os.environ.copy()
-            if self.access_key_id:
-                env['AWS_ACCESS_KEY_ID'] = self.access_key_id
-            if self.secret_access_key:
-                env['AWS_SECRET_ACCESS_KEY'] = self.secret_access_key
-            if self.session_token:
-                env['AWS_SESSION_TOKEN'] = self.session_token
+            base = f'aws --cli-connect-timeout 19 --region {region} {service} {command} {extra}'
+        return base.strip()
+
+    def _build_env(self, profile):
+        if profile:
+            return None
+        env = os.environ.copy()
+        for var_name in (
+            "AWS_PROFILE",
+            "AWS_DEFAULT_PROFILE",
+            "AWS_SHARED_CREDENTIALS_FILE",
+            "AWS_CONFIG_FILE",
+            "AWS_SDK_LOAD_CONFIG",
+            "AWS_CONTAINER_CREDENTIALS_RELATIVE_URI",
+            "AWS_CONTAINER_CREDENTIALS_FULL_URI",
+            "AWS_CONTAINER_AUTHORIZATION_TOKEN",
+            "AWS_WEB_IDENTITY_TOKEN_FILE",
+            "AWS_ROLE_ARN",
+            "AWS_ROLE_SESSION_NAME",
+            "AWS_CREDENTIAL_EXPIRATION",
+            "AWS_SECURITY_TOKEN",
+        ):
+            env.pop(var_name, None)
+        if self.access_key_id:
+            env['AWS_ACCESS_KEY_ID'] = self.access_key_id
+        if self.secret_access_key:
+            env['AWS_SECRET_ACCESS_KEY'] = self.secret_access_key
+        if self.session_token:
+            env['AWS_SESSION_TOKEN'] = self.session_token
+        else:
+            env.pop("AWS_SESSION_TOKEN", None)
+        env["AWS_EC2_METADATA_DISABLED"] = "true"
+        return env
+
+    def run_command(self, profile, region, service, command, extra='', cont=0):
+        full_command = self._build_command(profile, region, service, command, extra)
+        env = self._build_env(profile)
         
         try:
             result = subprocess.run(full_command, shell=True, capture_output=True, timeout=20, env=env)
@@ -184,14 +210,15 @@ class AWSBruteForce():
                     name_string = "OrganizationAccountAccessRole"
                     arn_string = f"arn:aws:iam::123456789012:role/{name_string}"
 
-                    test_cmd = f"aws --cli-connect-timeout 19 --profile {profile} --region {region} {service} {command} {extra} {required_arg} {name_string}"
-                    test_result = subprocess.run(test_cmd, shell=True, capture_output=True, timeout=20)
+                    test_extra = f"{extra} {required_arg} {name_string}".strip()
+                    test_cmd = self._build_command(profile, region, service, command, test_extra)
+                    test_result = subprocess.run(test_cmd, shell=True, capture_output=True, timeout=20, env=env)
                     test_output = test_result.stdout.decode() + test_result.stderr.decode()
 
                     if re.search(r'ValidationException|ValidationError|InvalidArnException|InvalidRequestException|InvalidParameterValueException|InvalidARNFault|Invalid ARN|InvalidIpamScopeId.Malformed|InvalidParameterException|invalid literal for', test_output, re.I):
-                        extra = f"{extra} {required_arg} {arn_string}"
+                        extra = f"{extra} {required_arg} {arn_string}".strip()
                     else:
-                        extra = f"{extra} {required_arg} {name_string}"
+                        extra = f"{extra} {required_arg} {name_string}".strip()
                     
                     if cont < 3:
                         self.run_command(profile, region, service, command, extra, cont+1)

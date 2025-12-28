@@ -460,21 +460,31 @@ class GCPPEASS(CloudPEASS):
 		try:
 			returnedPermissions = req.execute()
 			have_perms = returnedPermissions.get("permissions", [])
-		except googleapiclient.errors.HttpError as e:			
-			# If a permission is reported as invalid, remove it and retry
-			retry = False
-			for perm in perms.copy():
-				if " " + perm + " " in str(e):
-					retry = True
-					perms.remove(perm)
-					INVALID_PERMS[resource_id] = INVALID_PERMS.get(resource_id, []) + [perm]
+		except googleapiclient.errors.HttpError as e:
+			# Handle 400 errors - one or more permissions in the batch are invalid for this resource type
+			# GCP's API doesn't tell us which specific permission is invalid, so we need to binary search
+			if e.resp.status == 400 and len(perms) > 1:
+				# Use binary search to efficiently find valid vs invalid permissions
+				# This is much faster than testing one-by-one (O(log n) splits vs O(n) tests)
+				mid = len(perms) // 2
+				first_half = perms[:mid]
+				second_half = perms[mid:]
+				
+				# Recursively test each half
+				have_perms.extend(self.check_permissions(resource_id, first_half, verbose))
+				have_perms.extend(self.check_permissions(resource_id, second_half, verbose))
+			elif e.resp.status == 400 and len(perms) == 1:
+				# Single permission is invalid for this resource type
+				INVALID_PERMS[resource_id] = INVALID_PERMS.get(resource_id, []) + perms
 			
-			if retry:
-				return self.check_permissions(resource_id, perms, verbose)
+			# For other HTTP errors (403, 404, etc.), don't retry - they indicate real access issues
+			elif verbose:
+				print(f"HTTP {e.resp.status} error checking permissions on {resource_id}")
 		
 		except Exception as e:
-			print("Error:")
-			print(e)
+			if verbose:
+				print(f"Unexpected error checking permissions on {resource_id}:")
+				print(e)
 
 		if have_perms and verbose:
 			print(f"Found: {have_perms}")

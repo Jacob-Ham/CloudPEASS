@@ -146,6 +146,7 @@ class CloudPEASS:
         self.not_use_ht_ai = not_use_ht_ai
         self.num_threads = int(num_threads)
         self.out_path = out_path
+        self.principal_info = {}
         self.malicious_actions_response_format = MALICIOUS_ACTIONS_RESPONSE_FORMAT.replace("__CLOUD_SPECIFIC_EXAMPLE__", example_malicious_cloud_response)
         self.sensitive_response_format = SENSITIVE_RESPONSE_FORMAT.replace("__CLOUD_SPECIFIC_EXAMPLE__", example_sensitive_cloud_response).replace("__CLOUD_SPECIFIC_CLARIFICATIONS__", sensitive_perms_clarifications)
         self._rate_limit_lock = threading.Lock()
@@ -601,6 +602,7 @@ class CloudPEASS:
                 resource_ids.append(r_dict["id"] + ":" + r_dict["type"] + ":" + r_dict["name"])
 
         return {
+            "principal": self.principal_info,
             "permissions": list(perms_set),
             "resources": resource_ids,
             "sensitive_perms": sensitive_perms_serializable,
@@ -614,7 +616,8 @@ class CloudPEASS:
         print(f"{Fore.YELLOW}[{Fore.BLUE}i{Fore.YELLOW}] If you want to learn cloud hacking, check out the trainings at {Fore.CYAN}https://training.hacktricks.xyz")
         
         print(f"{Fore.MAGENTA}\nGetting information about your principal...")
-        self.print_whoami_info()
+        whoami = self.print_whoami_info()
+        self.principal_info = whoami if isinstance(whoami, dict) else {}
         
         print(f"{Fore.MAGENTA}\nGetting all your permissions...")
         resources = self.get_resources_and_permissions()

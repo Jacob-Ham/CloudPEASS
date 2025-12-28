@@ -972,10 +972,11 @@ class GCPPEASS(CloudPEASS):
 		"""
 		
 		user_info = {
+			"cloud": "gcp",
 			"email": None,
 			"expires_in": None,
 			"audience": None,
-			"scopes": []
+			"scopes": [],
 		}
 
 		token = None
@@ -995,7 +996,12 @@ class GCPPEASS(CloudPEASS):
 					timeout=15,
 				)
 				if resp.status_code == 200:
-					user_info = resp.json()
+					raw = resp.json()
+					user_info["email"] = raw.get("email")
+					user_info["expires_in"] = raw.get("expires_in")
+					user_info["audience"] = raw.get("audience")
+					scope_str = raw.get("scope") or ""
+					user_info["scopes"] = scope_str.split() if scope_str else []
 				else:
 					print(f"{Fore.YELLOW}Warning: Unable to fetch user info from token (status={resp.status_code}). Continuing without whoami context.")
 			except Exception as e:
@@ -1050,6 +1056,8 @@ class GCPPEASS(CloudPEASS):
 		
 		if self.extra_token and token != self.extra_token and self.extra_token != self.credentials.token:
 			return self.print_whoami_info(True)
+		
+		return user_info
 	
 
 	def get_user_groups(self):

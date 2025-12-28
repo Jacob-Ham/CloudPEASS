@@ -226,11 +226,27 @@ class AzurePEASS(CloudPEASS):
         Prints the current principal information.
         This is useful for debugging and understanding the context of the permissions being analyzed.
         """
+        whoami = {
+            "cloud": "azure",
+            "tenant_id": self.tenant_id,
+            "arm": {},
+            "graph": {},
+        }
 
         if self.arm_token:
             try:
                 # Get also email and groups
                 decoded = jwt.decode(self.arm_token, options={"verify_signature": False, "verify_aud": False})
+                whoami["tenant_id"] = whoami["tenant_id"] or decoded.get("tid")
+                whoami["arm"] = {
+                    "oid": decoded.get("oid"),
+                    "aud": decoded.get("aud"),
+                    "upn": decoded.get("upn"),
+                    "email": decoded.get("email"),
+                    "appid": decoded.get("appid"),
+                    "scp": decoded.get("scp"),
+                    "roles": decoded.get("roles"),
+                }
                 print(f"{Fore.BLUE}Current Principal ID (ARM Token): {Fore.WHITE}{decoded.get('oid', 'Unknown')}")
                 print(f"{Fore.BLUE}Current Audience (ARM Token): {Fore.WHITE}{decoded.get('aud', 'Unknown')}")
                 if 'upn' in decoded:
@@ -255,6 +271,16 @@ class AzurePEASS(CloudPEASS):
             try:
                 # Decode the Graph token to get the current principal information
                 decoded = jwt.decode(self.graph_token, options={"verify_signature": False, "verify_aud": False})
+                whoami["tenant_id"] = whoami["tenant_id"] or decoded.get("tid")
+                whoami["graph"] = {
+                    "oid": decoded.get("oid"),
+                    "aud": decoded.get("aud"),
+                    "upn": decoded.get("upn"),
+                    "email": decoded.get("email"),
+                    "appid": decoded.get("appid"),
+                    "scp": decoded.get("scp"),
+                    "roles": decoded.get("roles"),
+                }
                 print(f"{Fore.BLUE}Current Principal ID (Graph Token): {Fore.WHITE}{decoded.get('oid', 'Unknown')}")
                 print(f"{Fore.BLUE}Current Audience (Graph Token): {Fore.WHITE}{decoded.get('aud', 'Unknown')}")
                 if 'upn' in decoded:
@@ -317,6 +343,8 @@ class AzurePEASS(CloudPEASS):
                 self.enumerate_onenote_content(onenote_token)
             else:
                 print(f"{Fore.RED}No FOCI app with OneNote scopes found. Skipping OneNote enumeration.{Fore.WHITE}")
+
+        return whoami
 
             # CONTACTS
             print(f"{Fore.YELLOW}\nEnumerating Contacts:")

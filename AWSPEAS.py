@@ -557,7 +557,16 @@ class AWSPEASS(CloudPEASS):
         Prints the current principal information (ARN, type, and name).
         This is useful for debugging and understanding the context of the permissions being analyzed.
         """
-        
+        whoami = {
+            "cloud": "aws",
+            "account_id": None,
+            "user_id": None,
+            "arn": None,
+            "principal_type": None,
+            "principal_name": None,
+            "is_canary": None,
+            "is_canary_reason": None,
+        }
         try:
             acc_id, is_canary = self.AWSAccount_from_AWSKeyID(self.credentials.access_key.strip())
             if is_canary:
@@ -571,6 +580,16 @@ class AWSPEASS(CloudPEASS):
             identity = self.sts_client.get_caller_identity()
             principal_arn = identity.get("Arn")
             principal_type, principal_name = self.parse_principal(principal_arn)
+
+            whoami.update(
+                {
+                    "account_id": identity.get("Account"),
+                    "user_id": identity.get("UserId"),
+                    "arn": principal_arn,
+                    "principal_type": principal_type,
+                    "principal_name": principal_name,
+                }
+            )
             
             print(f"{Fore.BLUE}Current Principal ARN: {Fore.WHITE}{principal_arn}")
             print(f"{Fore.BLUE}Principal Type: {Fore.WHITE}{principal_type}")
@@ -578,6 +597,8 @@ class AWSPEASS(CloudPEASS):
 
             # Check if the principal is a canary user
             is_canary, reason = self.is_canary_user(principal_arn, principal_name)
+            whoami["is_canary"] = is_canary
+            whoami["is_canary_reason"] = reason
             print(f"{Fore.BLUE}Is Canary User: {Fore.WHITE}{is_canary}")
             if is_canary:
                 print(f"{Fore.RED}Is Canary Reason: {Fore.WHITE}{reason}{Fore.RESET}")
@@ -588,6 +609,7 @@ class AWSPEASS(CloudPEASS):
         
         except Exception as e:
             print(f"{Fore.RED}Error retrieving principal information: {e}")
+        return whoami
 
     def get_resources_and_permissions(self):
         """

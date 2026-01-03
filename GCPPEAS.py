@@ -593,7 +593,8 @@ class GCPPEASS(CloudPEASS):
 					for member in members:
 						affected = False
 						member = member.lower()
-						if self.email.lower() in member:
+						email = (self.email or "").lower()
+						if email and email in member:
 							affected = True
 						
 						elif "group:" in member and self.groups:
@@ -972,6 +973,14 @@ class GCPPEASS(CloudPEASS):
 					print(f"{Fore.YELLOW}Warning: Unable to fetch user info from token (status={resp.status_code}). Continuing without whoami context.")
 			except Exception as e:
 				print(f"{Fore.YELLOW}Warning: Unable to fetch user info from token ({type(e).__name__}). Continuing without whoami context.")
+		
+		# Service account tokens don't always return an email in tokeninfo.
+		if not user_info.get("email"):
+			sa_email = getattr(self.credentials, "service_account_email", None)
+			if sa_email:
+				user_info["email"] = sa_email
+				if not user_info.get("scopes") and getattr(self.credentials, "scopes", None):
+					user_info["scopes"] = self.credentials.scopes
 		if "email" in user_info and user_info["email"]:
 			self.email = user_info["email"]
 			self.is_sa = user_info["email"].endswith("iam.gserviceaccount.com")
